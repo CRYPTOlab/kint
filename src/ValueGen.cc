@@ -163,7 +163,7 @@ struct ValueVisitor : InstVisitor<ValueVisitor, SMTExpr> {
 	}
 
 	SMTExpr visitGEPOperator(GEPOperator &GEP) {
-		unsigned PtrSize = TD.getPointerSizeInBits();
+		unsigned PtrSize = TD.getPointerSizeInBits(0);
 		// Start from base.
 		SMTExpr Offset = get(GEP.getPointerOperand());
 		// Increase refcnt.
