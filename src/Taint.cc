@@ -67,7 +67,7 @@ bool TaintPass::checkTaintSource(Instruction *I)
 	bool changed = false;
 
 	if (MDNode *MD = I->getMetadata("taint")) {
-		StringRef s = llvm::dyn_cast<MDString>(MD->getOperand(0))->getString();
+		StringRef s = dyn_cast<MDString>(MD->getOperand(0))->getString();
 		if (s == "")
 			return false;
 
@@ -155,7 +155,7 @@ bool TaintPass::doFinalization(Module *M) {
 				if (!I->getMetadata("taint"))
 					I->setMetadata("taint", MD);
 			} else if (MDNode *MD = I->getMetadata("taint")) {
-				StringRef src = llvm::dyn_cast<MDString>(
+				StringRef src = dyn_cast<MDString>(
 									MD->getOperand(0))->getString();
 				if (src == "")
 					I->setMetadata("taint", NULL);
