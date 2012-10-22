@@ -81,12 +81,12 @@ static Instruction * insertIntSat(Value *V, Instruction *I, Instruction *IP,
 	return CI;
 }
 
-static Instruction * insertIntSat(Value *V, Instruction *I, StringRef Bug) {
-	return insertIntSat(V, I, I, Bug, I->getDebugLoc());
+void insertIntSat(Value *V, Instruction *I, StringRef Bug) {
+	insertIntSat(V, I, I, Bug, I->getDebugLoc());
 }
 
-static Instruction * insertIntSat(Value *V, Instruction *I) {
-	return insertIntSat(V, I, I->getOpcodeName());
+void insertIntSat(Value *V, Instruction *I) {
+	insertIntSat(V, I, I->getOpcodeName());
 }
 
 bool IntRewrite::runOnFunction(Function &F) {
