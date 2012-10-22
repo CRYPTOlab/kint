@@ -2,9 +2,13 @@
 #include "SMTSolver.h"
 #include <llvm/DebugInfo.h>
 #include <llvm/Instruction.h>
+#include <llvm/BasicBlock.h>
+#include <llvm/Function.h>
+#include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Metadata.h>
 
 using namespace llvm;
 
@@ -39,6 +43,18 @@ void Diagnostic::backtrace(Instruction *I) {
 
 void Diagnostic::bug(const Twine &Str) {
 	OS << "---\n" << "bug: " << Str << "\n";
+}
+
+void Diagnostic::classify(Value *V) {
+	Instruction *I = dyn_cast<Instruction>(V);
+	if (!I)
+		return;
+
+	MDNode *MD = I->getMetadata("taint");
+	if (MD) {
+		StringRef s = dyn_cast<MDString>(MD->getOperand(0))->getString();
+		OS << "taint: " << s << "\n";
+	}
 }
 
 void Diagnostic::status(int Status) {

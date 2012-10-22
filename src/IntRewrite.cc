@@ -58,25 +58,35 @@ private:
 
 } // anonymous namespace
 
-static void insertIntSat(Value *V, Instruction *IP, StringRef Bug, const DebugLoc &DbgLoc) {
+static Instruction * insertIntSat(Value *V, Instruction *I, Instruction *IP, 
+		StringRef Bug, const DebugLoc &DbgLoc) {
 	Module *M = IP->getParent()->getParent()->getParent();
 	LLVMContext &C = M->getContext();
 	FunctionType *T = FunctionType::get(Type::getVoidTy(C), Type::getInt1Ty(C), false);
 	Function *F = cast<Function>(M->getOrInsertFunction("int.sat", T));
 	F->setDoesNotThrow();
-	CallInst *I = CallInst::Create(F, V, "", IP);
-	I->setDebugLoc(DbgLoc);
+	CallInst *CI = CallInst::Create(F, V, "", IP);
+	CI->setDebugLoc(DbgLoc);
 	// Embed operation name in metadata.
 	MDNode *MD = MDNode::get(C, MDString::get(C, Bug));
-	I->setMetadata("bug", MD);
+	CI->setMetadata("bug", MD);
+
+	// Add taint metadata
+	for (unsigned i = 0; i < I->getNumOperands(); ++i) {
+		if (MDNode *MD = I->getMetadata("taint")) {
+			CI->setMetadata("taint", MD);
+			break;
+		}
+	}
+	return CI;
 }
 
-void insertIntSat(Value *V, Instruction *I, StringRef Bug) {
-	insertIntSat(V, I, Bug, I->getDebugLoc());
+static Instruction * insertIntSat(Value *V, Instruction *I, StringRef Bug) {
+	return insertIntSat(V, I, I, Bug, I->getDebugLoc());
 }
 
-static void insertIntSat(Value *V, Instruction *I) {
-	insertIntSat(V, I, I->getOpcodeName());
+static Instruction * insertIntSat(Value *V, Instruction *I) {
+	return insertIntSat(V, I, I->getOpcodeName());
 }
 
 bool IntRewrite::runOnFunction(Function &F) {
@@ -216,7 +226,7 @@ bool IntRewrite::insertOverflowCheck(Instruction *I, Intrinsic::ID SID, Intrinsi
 	const DebugLoc &DbgLoc = I->getDebugLoc();
 	for (ObSet::iterator i = ObPoints.begin(), e = ObPoints.end(); i != e; ++i) {
 		BasicBlock *ObBB = *i;
-		insertIntSat(V, ObBB->getTerminator(), Anno, DbgLoc);
+		insertIntSat(V, I, ObBB->getTerminator(), Anno, DbgLoc);
 	}
 	return true;
 }
