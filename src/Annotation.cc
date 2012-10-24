@@ -9,6 +9,7 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/Transforms/Utils/Local.h>
 
 #include "Annotation.h"
@@ -24,7 +25,7 @@ static inline bool needAnnotation(Value *V) {
 	return false;
 }
 
-std::string AnnotationPass::getAnnotation(Value *V) {
+std::string getAnnotation(Value *V, Module *M) {
 	std::string id;
 
 	if (GlobalVariable *GV = dyn_cast<GlobalVariable>(V))
@@ -58,16 +59,34 @@ std::string AnnotationPass::getAnnotation(Value *V) {
 	return id;
 }
 
-bool AnnotationPass::runOnFunction(Function &F) {
+static bool annotateLoadStore(Instruction *I) {
+	std::string Anno;
+	LLVMContext &VMCtx = I->getContext();
+	Module *M = I->getParent()->getParent()->getParent();
+
+	if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+		llvm::Value *V = LI->getPointerOperand();
+		if (needAnnotation(V))
+			Anno = getAnnotation(V, M);
+	} else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+		Value *V = SI->getPointerOperand();
+		if (needAnnotation(V))
+			Anno = getAnnotation(V, M);
+	}
+
+	if (Anno.empty())
+		return false;
+
+	MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, Anno));
+	I->setMetadata(MD_ID, MD);
+	return true;
+}
+
+static bool annotateArguments(Function &F) {
 	bool Changed = false;
 	LLVMContext &VMCtx = F.getContext();
 
-	// taint annotation for linux system call arguemnts
-	MDNode *SyscallAnno = NULL;
-	if (F.getName().startswith("sys_"))
-		SyscallAnno = MDNode::get(VMCtx, MDString::get(VMCtx, "syscall"));
-
-	// annotate integer arguments
+	// replace integer arguments with function calls
 	for (Function::arg_iterator i = F.arg_begin(),
 			e = F.arg_end(); i != e; ++i) {
 		if (F.isVarArg())
@@ -85,70 +104,118 @@ bool AnnotationPass::runOnFunction(Function &F) {
 			F.getEntryBlock().getFirstInsertionPt());
 
 		MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, getArgId(A)));
-		CI->setMetadata("id", MD);
-		if (SyscallAnno)
-			CI->setMetadata("taint", SyscallAnno);
-
+		CI->setMetadata(MD_ID, MD);
 		A->replaceAllUsesWith(CI);
 		Changed = true;
 	}
+	return Changed;
+}
 
+static StringRef extractConstantString(Value *V) {
+	if (ConstantExpr *CE = dyn_cast<ConstantExpr>(V)) {
+		if (CE->isGEPWithNoNotionalOverIndexing())
+			if (GlobalVariable *GV = dyn_cast<GlobalVariable>(CE->getOperand(0)))
+				if (Constant *C = GV->getInitializer())
+					if (ConstantDataSequential *S = 
+								dyn_cast<ConstantDataSequential>(C))
+						if (S->isCString())
+							return S->getAsCString();
+	}
+	return "";
+}
+
+static bool annotateTaintSource(CallInst *CI, 
+								SmallPtrSet<Instruction *, 4> &Erase) {
+	LLVMContext &VMCtx = CI->getContext();
+	Function *F = CI->getParent()->getParent();
+	Function *CF = CI->getCalledFunction();
+	StringRef Name = CF->getName();
+
+	// linux system call arguemnts are taint
+	if (Name.startswith("kint_arg.i") && F->getName().startswith("sys_")) {
+		MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, "syscall"));
+		CI->setMetadata(MD_TaintSrc, MD);
+		return true;
+	}
+	
+	// other taint sources: int __kint_taint(const char *, ...);
+	if (Name == "__kint_taint") {
+		// the 1st arg is the description
+		StringRef Desc = extractConstantString(CI->getArgOperand(0));
+		// the 2nd arg and return value are tainted
+		MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, Desc));
+		if (Instruction *I = dyn_cast_or_null<Instruction>(CI->getArgOperand(1)))
+			I->setMetadata(MD_TaintSrc, MD);
+		if (!CI->use_empty())
+			CI->setMetadata(MD_TaintSrc, MD);
+		else
+			Erase.insert(CI);
+		return true;
+	}
+	return false;
+}
+
+static bool annotateSink(CallInst *CI) {
+	#define P std::make_pair
+	static std::pair<const char *, int> Allocs[] = {
+		P("dma_alloc_from_coherent", 1),
+		P("__kmalloc", 0),
+		P("kmalloc", 0),
+		P("__kmalloc_node", 0),
+		P("kmalloc_node", 0),
+		P("kzalloc", 0),
+		P("kcalloc", 0),
+		P("kcalloc", 1),
+		P("kmemdup", 1),
+		P("memdup_user", 1),
+		P("pci_alloc_consistent", 1),
+		P("__vmalloc", 0),
+		P("vmalloc", 0),
+		P("vmalloc_user", 0),
+		P("vmalloc_node", 0),
+		P("vzalloc", 0),
+		P("vzalloc_node", 0),
+	};
+	#undef P
+
+	LLVMContext &VMCtx = CI->getContext();
+	StringRef Name = CI->getCalledFunction()->getName();
+
+	for (unsigned i = 0; i < sizeof(Allocs) / sizeof(Allocs[0]); ++i) {
+		if (Name == Allocs[i].first) {
+			Value *V = CI->getArgOperand(Allocs[i].second);
+			if (Instruction *I = dyn_cast_or_null<Instruction>(V)) {
+				MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, Name));
+				I->setMetadata(MD_Sink, MD);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+bool AnnotationPass::runOnFunction(Function &F) {
+	bool Changed = false;
+
+	Changed |= annotateArguments(F);
+
+	SmallPtrSet<Instruction *, 4> EraseSet;
 	for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
 		Instruction *I = &*i;
 
 		if (isa<LoadInst>(I) || isa<StoreInst>(I)) {
-			// annotate load/stores
-			std::string Anno;
-			if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-				llvm::Value *V = LI->getPointerOperand();
-				if (needAnnotation(V))
-					Anno = getAnnotation(V);
-			} else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-				Value *V = SI->getPointerOperand();
-				if (needAnnotation(V))
-					Anno = getAnnotation(V);
-			}
-
-			if (Anno.empty())
-				continue;
-
-			MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, Anno));
-			I->setMetadata("id", MD);
-			Changed = true;
-
+			Changed |= annotateLoadStore(I);
 		} else if (CallInst *CI = dyn_cast<CallInst>(I)) {
-			// annotate taints
-			Function *CF = CI->getCalledFunction();
-			if (!CF)
+			if (!CI->getCalledFunction())
 				continue;
-
-			Value *V = NULL;
-			bool Replace;
-			if (CF->getName().startswith("__kint_taint_u")) {
-				// 1st arg is the tainted value
-				V = CI->getArgOperand(0);
-				Replace = true;
-			} else if (CF->getName() == "__kint_taint_any") {
-				// 2nd arg is the tainted value
-				V = CI->getArgOperand(1);
-				Replace = false;
-			}
-
-			// skip non-instruction taints (args, etc.)
-			Instruction *I = dyn_cast_or_null<Instruction>(V);
-			if (!I)
-				continue;
-			MDNode *MD = MDNode::get(VMCtx, MDString::get(VMCtx, CF->getName()));
-			I->setMetadata("taint", MD);
-
-			// erase __kint_taint_* calls
-			if (Replace) {
-				assert(CI->getType() == V->getType());
-				CI->replaceAllUsesWith(V);
-			}
-			CI->eraseFromParent();
-			Changed = true;
+			Changed |= annotateTaintSource(CI, EraseSet);
+			Changed |= annotateSink(CI);
 		}
+	}
+	for (SmallPtrSet<Instruction *, 4>::iterator i = EraseSet.begin(),
+			e = EraseSet.end(); i != e; ++i) {
+		(*i)->eraseFromParent();
 	}
 	return Changed;
 }
