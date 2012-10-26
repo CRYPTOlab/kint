@@ -23,8 +23,58 @@ typedef llvm::SmallPtrSet<llvm::Function *, 8> FuncSet;
 typedef std::map<llvm::StringRef, llvm::Function *> FuncMap;
 typedef std::map<std::string, FuncSet> FuncPtrMap;
 typedef llvm::DenseMap<llvm::CallInst *, FuncSet> CalleeMap;
-typedef std::map<std::string, bool /* is source */> TaintSet;
+typedef std::set<llvm::StringRef> DescSet;
 typedef std::map<std::string, CRange> RangeMap;
+
+
+class TaintMap {
+
+public:
+	typedef std::map<std::string, std::pair<DescSet, bool> > GlobalMap;
+	typedef std::map<llvm::Value *, DescSet> ValueMap;
+	
+	GlobalMap GTS;
+	ValueMap VTS;
+
+	void add(llvm::Value *V, const DescSet &D) {
+		VTS[V].insert(D.begin(), D.end());
+	}
+	void add(llvm::Value *V, llvm::StringRef D) {
+		VTS[V].insert(D);
+	}
+	DescSet* get(llvm::Value *V) {
+		ValueMap::iterator it = VTS.find(V);
+		if (it != VTS.end())
+			return &it->second;
+		return NULL;
+	}
+
+	DescSet* get(const std::string &ID) {
+		if (ID.empty())
+			return NULL;
+		GlobalMap::iterator it = GTS.find(ID);
+		if (it != GTS.end())
+			return &it->second.first;
+		return NULL;
+	}
+	bool add(const std::string &ID, const DescSet &D, bool isSource = false) {
+		if (ID.empty())
+			return false;
+		std::pair<DescSet, bool> &entry = GTS[ID];
+		bool isNew = entry.first.empty();
+		entry.first.insert(D.begin(), D.end());
+		entry.second |= isSource;
+		return isNew;
+	}
+	bool isSource(const std::string &ID) {
+		if (ID.empty())
+			return false;
+		GlobalMap::iterator it = GTS.find(ID);
+		if (it == GTS.end())
+			return false;
+		return it->second.second;
+	}
+};
 
 struct GlobalContext {
 	// Map global function name to function defination
@@ -37,7 +87,7 @@ struct GlobalContext {
 	CalleeMap Callees;
 
 	// Taints
-	TaintSet Taints;
+	TaintMap Taints;
 
 	// Ranges
 	RangeMap IntRanges;
@@ -91,15 +141,15 @@ public:
 
 class TaintPass : public IterativeModulePass {
 private:
+	DescSet* getTaint(llvm::Value *);
 	bool runOnFunction(llvm::Function *);
-	bool isTaint(llvm::Value *V);
 	bool checkTaintSource(llvm::Value *);
 	bool markTaint(const std::string &Id, bool isSource);
 
 	bool checkTaintSource(llvm::Instruction *I);
 	bool checkTaintSource(llvm::Function *F);
 
-	typedef llvm::SmallPtrSet<llvm::Value *, 16> ValueTaintSet;
+	typedef llvm::DenseMap<llvm::Value *, DescSet> ValueTaintSet;
 	ValueTaintSet VTS;
 
 public:
