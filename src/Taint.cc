@@ -66,11 +66,7 @@ bool TaintPass::checkTaintSource(Instruction *I)
 	Module *M = I->getParent()->getParent()->getParent();
 	bool changed = false;
 
-	if (MDNode *MD = I->getMetadata("taint")) {
-		StringRef s = dyn_cast<MDString>(MD->getOperand(0))->getString();
-		if (s == "")
-			return false;
-
+	if (MDNode *MD = I->getMetadata(MD_TaintSrc)) {
 		VTS.insert(I);
 		changed |= markTaint(getValueId(I), true);
 		// mark all struct members as taint
@@ -80,6 +76,7 @@ bool TaintPass::checkTaintSource(Instruction *I)
 					changed |= markTaint(getStructId(STy, M, i), true);
 			}
 		}
+		(void )MD;
 	}
 	return changed;
 }
@@ -106,7 +103,7 @@ bool TaintPass::runOnFunction(Function *F)
 		// update VTS and global taint
 		VTS.insert(I);
 		if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-			if (MDNode *ID = SI->getMetadata("id")) {
+			if (MDNode *ID = SI->getMetadata(MD_ID)) {
 				StringRef sID = dyn_cast<MDString>
 					(ID->getOperand(0))->getString();
 				changed |= markTaint(sID);
@@ -152,14 +149,10 @@ bool TaintPass::doFinalization(Module *M) {
 		for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
 			Instruction *I = &*i;
 			if (isTaint(I)) {
-				if (!I->getMetadata("taint"))
-					I->setMetadata("taint", MD);
-			} else if (MDNode *MD = I->getMetadata("taint")) {
-				StringRef src = dyn_cast<MDString>(
-									MD->getOperand(0))->getString();
-				if (src == "")
-					I->setMetadata("taint", NULL);
-			}
+				if (!I->getMetadata(MD_Taint))
+					I->setMetadata(MD_Taint, MD);
+			} else
+				I->setMetadata(MD_Taint, NULL);
 		}
 	}
 	return true;

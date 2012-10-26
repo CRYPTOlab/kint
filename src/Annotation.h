@@ -1,3 +1,5 @@
+#pragma once
+
 #include <llvm/Module.h>
 #include <llvm/Type.h>
 #include <llvm/Instructions.h>
@@ -7,10 +9,10 @@
 #include <string>
 #include <llvm/Support/Debug.h>
 
-const char * MD_TaintSrc = "taint_src";
-const char * MD_Taint = "taint";
-const char * MD_Sink = "sink";
-const char * MD_ID = "id";
+#define MD_TaintSrc   "taint_src"
+#define MD_Taint      "taint"
+#define MD_Sink       "sink"
+#define MD_ID         "id"
 
 class AnnotationPass : public llvm::FunctionPass {
 protected:
