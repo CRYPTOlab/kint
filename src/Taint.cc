@@ -24,13 +24,13 @@ static inline StringRef asString(MDNode *MD) {
 }
 
 static inline MDString *toMDString(LLVMContext &VMCtx, DescSet *D) {
-	Twine s;
+	std::string s;
 	for (DescSet::iterator i = D->begin(), e = D->end(); i != e; ++i) {
 		if (i != D->begin())
-			s.concat(", ");
-		s.concat(*i);
+			s += ", ";
+		s += (*i).str();
 	}
-	return MDString::get(VMCtx, s.str());
+	return MDString::get(VMCtx, s);
 }
 
 // Check both local taint and global sources
@@ -87,7 +87,7 @@ bool TaintPass::checkTaintSource(Instruction *I)
 bool TaintPass::runOnFunction(Function *F)
 {
 	bool changed = false;
-	
+
 	for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
 		Instruction *I = &*i;
 		
@@ -97,25 +97,27 @@ bool TaintPass::runOnFunction(Function *F)
 		// for call instruction, propagate taint to arguments instead
 		// of from arguments
 		if (CallInst *CI = dyn_cast<CallInst>(I)) {
-			if (!CI->isInlineAsm() && Ctx->Callees.count(CI)) {
-				FuncSet &CEEs = Ctx->Callees[CI];
-				for (FuncSet::iterator j = CEEs.begin(), je = CEEs.end();
-					 j != je; ++j) {
-					// skip vaarg and builtin functions
-					if ((*j)->isVarArg() 
-						|| (*j)->getName().find('.') != StringRef::npos)
-						continue;
-					
-					// mark corresponding args tainted on all possible callees
-					for (unsigned a = 0; a < CI->getNumArgOperands(); ++a) {
-						if (DescSet *DS = getTaint(CI->getArgOperand(a))) {
-							changed |= TM.add(getArgId(*j, a), *DS);
-						}
+			if (CI->isInlineAsm() || !Ctx->Callees.count(CI))
+				continue;
+
+			FuncSet &CEEs = Ctx->Callees[CI];
+			for (FuncSet::iterator j = CEEs.begin(), je = CEEs.end();
+				 j != je; ++j) {
+				// skip vaarg and builtin functions
+				if ((*j)->isVarArg() 
+					|| (*j)->getName().find('.') != StringRef::npos)
+					continue;
+				
+				// mark corresponding args tainted on all possible callees
+				if (F->getName() == "do_futex")
+					dbgs() << (*j)->getName() << "\n";
+				for (unsigned a = 0; a < CI->getNumArgOperands(); ++a) {
+					if (DescSet *DS = getTaint(CI->getArgOperand(a))) {
+						CI->getArgOperand(a)->dump();
+						changed |= TM.add(getArgId(*j, a), *DS);
 					}
 				}
 			}
-			if (DescSet *DS = getTaint(CI))
-				changed |= TM.add(getRetId(CI), *DS);
 			continue;
 		}
 
