@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 	TPass.run(Modules);
 
 	RangePass RPass(&GlobalCtx);
-	//RPass.run(Modules);
+	RPass.run(Modules);
 
 	if (NoWriteback) {
 		TPass.dumpTaints();

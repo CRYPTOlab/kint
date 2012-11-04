@@ -50,10 +50,13 @@ void Diagnostic::classify(Value *V) {
 	if (!I)
 		return;
 
-	MDNode *MD = I->getMetadata("taint");
-	if (MD) {
+	if (MDNode *MD = I->getMetadata("taint")) {
 		StringRef s = dyn_cast<MDString>(MD->getOperand(0))->getString();
 		OS << "taint: " << s << "\n";
+	}
+	if (MDNode *MD = I->getMetadata("sink")) {
+		StringRef s = dyn_cast<MDString>(MD->getOperand(0))->getString();
+		OS << "sink: " << s << "\n";
 	}
 }
 
