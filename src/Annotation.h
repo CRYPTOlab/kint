@@ -1,3 +1,5 @@
+#pragma once
+
 #include <llvm/Module.h>
 #include <llvm/Type.h>
 #include <llvm/Instructions.h>
@@ -7,10 +9,14 @@
 #include <string>
 #include <llvm/Support/Debug.h>
 
+#define MD_TaintSrc   "taint_src"
+#define MD_Taint      "taint"
+#define MD_Sink       "sink"
+#define MD_ID         "id"
+
 class AnnotationPass : public llvm::FunctionPass {
 protected:
 	llvm::Module *M;
-	std::string getAnnotation(llvm::Value *V);
 public:
 	static char ID;
 	AnnotationPass() : FunctionPass(ID) { }
@@ -50,7 +56,7 @@ static inline std::string getScopeName(llvm::StructType *Ty, llvm::Module *M) {
 }
 
 static inline llvm::StringRef getLoadStoreId(llvm::Instruction *I) {
-	if (llvm::MDNode *MD = I->getMetadata("id"))
+	if (llvm::MDNode *MD = I->getMetadata(MD_ID))
 		return llvm::dyn_cast<llvm::MDString>(MD->getOperand(0))->getString();
 	return llvm::StringRef();
 }

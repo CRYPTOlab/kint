@@ -50,6 +50,7 @@ private:
 
 	void runOnFunction(Function &);
 	void check(CallInst *);
+	void classify(Value *);
 	SMTStatus query(Value *, Instruction *);
 };
 
@@ -121,6 +122,7 @@ SMTStatus IntSat::query(Value *V, Instruction *I) {
 	Diag.bug(cast<MDString>(MD->getOperand(0))->getString());
 	// Output location.
 	Diag.status(Res);
+	Diag.classify(I);
 	Diag.backtrace(I);
 	// Output model.
 	if (SMTModelOpt && Model) {

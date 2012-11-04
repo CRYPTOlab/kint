@@ -15,6 +15,10 @@ libsat_la_SOURCES  = ValueGen.cc PathGen.cc Diagnostic.cc SMTSolver.cc
 libsat_la_SOURCES += ValueGen.h PathGen.h Diagnostic.h SMTSolver.h
 libsat_la_SOURCES += SMTBoolector.cc
 libsat_la_LIBADD   = -lboolector -llgl
+#libsat_la_SOURCES += SMTSonolar.cc
+#libsat_la_LIBADD   = -lsonolar
+#libsat_la_SOURCES += SMTZ3.cc
+#libsat_la_LIBADD   = -lz3 -lgomp
 libsat_la_LDFLAGS  = -L$(top_builddir)/lib
 
 libintck_la_SOURCES = IntRewrite.cc IntLibcalls.cc IntSat.cc \
