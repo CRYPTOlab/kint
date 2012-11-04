@@ -64,7 +64,7 @@ static MDNode * findSink(Value *V) {
 			if (MDNode *MD = I->getMetadata("sink"))
 				return MD;
 			if (isa<BinaryOperator>(I) || isa<CastInst>(I))
-				return findSink(V);
+				return findSink(I);
 		}
 	}
 	return NULL;
