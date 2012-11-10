@@ -58,6 +58,18 @@ private:
 
 } // anonymous namespace
 
+static MDNode * findSink(Value *V) {
+	for (Value::use_iterator i = V->use_begin(), e = V->use_end(); i != e; ++i) {
+		if (Instruction *I = dyn_cast<Instruction>(*i)) {
+			if (MDNode *MD = I->getMetadata("sink"))
+				return MD;
+			if (isa<BinaryOperator>(I) || isa<CastInst>(I))
+				return findSink(I);
+		}
+	}
+	return NULL;
+}
+
 static Instruction * insertIntSat(Value *V, Instruction *I, Instruction *IP, 
 		StringRef Bug, const DebugLoc &DbgLoc) {
 	Module *M = IP->getParent()->getParent()->getParent();
@@ -78,6 +90,10 @@ static Instruction * insertIntSat(Value *V, Instruction *I, Instruction *IP,
 			break;
 		}
 	}
+	// Add sink metadata
+	if (MDNode *MD = findSink(I))
+		CI->setMetadata("sink", MD);
+
 	return CI;
 }
 

@@ -40,9 +40,9 @@ DescSet * TaintPass::getTaint(Value *V) {
 	if (DescSet *DS = TM.get(V->stripPointerCasts()))
 		return DS;
 	
-	// if value is not taint, check global taint
+	// if value is not taint, check global taint.
+	// For call, taint if any possible callee could return taint
 	if (CallInst *CI = dyn_cast<CallInst>(V)) {
-		// taint if any possible callee could return taint
 		if (!CI->isInlineAsm() && Ctx->Callees.count(CI)) {
 			FuncSet &CEEs = Ctx->Callees[CI];
 			for (FuncSet::iterator i = CEEs.begin(), e = CEEs.end();
@@ -51,10 +51,10 @@ DescSet * TaintPass::getTaint(Value *V) {
 					TM.add(CI, *DS);
 			}
 		}
-	} else if (DescSet *DS = TM.get(getValueId(V))) {
-		// arguments and loads
-		TM.add(V, *DS);
 	}
+	// For arguments and loads
+	if (DescSet *DS = TM.get(getValueId(V)))
+		TM.add(V, *DS);
 	return TM.get(V);
 }
 
@@ -109,13 +109,9 @@ bool TaintPass::runOnFunction(Function *F)
 					continue;
 				
 				// mark corresponding args tainted on all possible callees
-				if (F->getName() == "do_futex")
-					dbgs() << (*j)->getName() << "\n";
 				for (unsigned a = 0; a < CI->getNumArgOperands(); ++a) {
-					if (DescSet *DS = getTaint(CI->getArgOperand(a))) {
-						CI->getArgOperand(a)->dump();
+					if (DescSet *DS = getTaint(CI->getArgOperand(a)))
 						changed |= TM.add(getArgId(*j, a), *DS);
-					}
 				}
 			}
 			continue;
