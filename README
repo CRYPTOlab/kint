@@ -71,9 +71,7 @@ tainted and overflowed value reaches that argument.
 
 You can obtain our annotated linux kernel source as follows:
 
-	$ git clone git@g.csail.mit.edu:kint-linux
-	$ cd kint-linux
-	$ git checkout kint
+	$ git clone -b kint git@g.csail.mit.edu:kint-linux
 
 
 Tautological comparison checker
