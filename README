@@ -40,6 +40,42 @@ Finally, run the following command in the project directory.
 You can find bug reports in `pintck.txt`.
 
 
+Taint annotation
+------------------------
+
+To help you focus on high-risk reports, the global analysis performs
+taint analysis that marks values derived from untrusted inputs in the
+generated LLVM bitcode.  You can tell Kint what is taint source by
+annotating the target software's source code with this intrinsic
+function:
+
+	int __kint_taint(const char *description, value, ...);
+
+Kint will mark the second argument (value) as a taint source. 'value'
+can be of any integer or pointer types. The return value of
+__kint_taint(), if used, is also considered as a taint.
+
+For Linux kernel, for example, we redefined the macro copy_from_user()
+and get_user() as follows:
+
+	#define copy_from_user(to, from, n) \
+		__kint_taint("copy_from_user", (to), from, n)
+	#define get_user(x, ptr) \
+		({ (x) = *(ptr); __kint_taint("get_user", (x)); })
+
+To annotate sensitive contexts (taint sinks, such as allocation
+sizes), you should change annotateSink() in Kint's src/Annotation.cc.
+Each pair in the 'Allocs' array specifies a function name and which of
+its argument is sensitive. Kint will highlight the report if it sees a
+tainted and overflowed value reaches that argument.
+
+You can obtain our annotated linux kernel source as follows:
+
+	$ git clone git@g.csail.mit.edu:kint-linux
+	$ cd kint-linux
+	$ git checkout kint
+
+
 Tautological comparison checker
 -------------------------------
 
