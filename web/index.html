@@ -1,5 +1,79 @@
 <html>
+<head>
+<title>KINT</title>
+</head>
 <body>
-Hello world..
+
+<div>
+<center><h1>Improving Integer Security for Systems with KINT</h1></center>
+</div>
+
+<h3>Overview</h3>
+
+<p>
+KINT is a tool that uses scalable static analysis to detect integer
+errors in C programs. KINT generates constraints from source code
+and user annotations, and feeds them into a constraint solver for
+deciding whether an integer error can occur.  KINT identified more
+than 100 integer errors in the Linux kernel, the lighttpd web server,
+and OpenSSH, which were confirmed and fixed by the developers.
+</p>
+
+<h3>Publications</h3>
+
+<ul>
+
+<li>
+<a href="http://pdos.csail.mit.edu/papers/kint:osdi12.pdf">Improving Integer Security for Systems with KINT</a>.<br>
+Xi Wang, Haogang Chen, Zhihao Jia, Nickolai Zeldovich, M. Frans Kaashoek.<br>
+Proceedings of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI '12),
+Hollywood, CA, October 2012.
+
+</ul>
+
+<h3>Examples of vulnerabilities</h3>
+
+<p>Here are some vulnerabilities found by KINT.</p>
+
+<ul>
+
+<li>
+<a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-4362">CVE-2011-4362</a>,
+lighttpd
+</li>
+
+<li>
+<a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2012-0038">CVE-2012-0038</a>,
+Linux kernel (xfs)
+</li>
+
+<li>
+<a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2012-0044">CVE-2012-0044</a>,
+Linux kernel (drm)
+</li>
+
+<li>
+<a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2012-2100">CVE-2012-2100</a>,
+Linux kernel (ext4)
+</li>
+
+</ul>
+
+<h3>Software</h3>
+
+<p>Coming soon.</p>
+
+<h3>People</h3>
+
+<ul>
+
+<li><a href="http://pdos.csail.mit.edu/~xi/">Xi Wang</a></li>
+<li><a href="http://pdos.csail.mit.edu/~hchen/">Haogang Chen</a></li>
+<li>Zhihao Jia</li>
+<li><a href="http://people.csail.mit.edu/nickolai/">Nickolai Zeldovich</a></li>
+<li><a href="http://pdos.csail.mit.edu/~kaashoek/">M. Frans Kaashoek</a></li>
+
+</ul>
+
 </body>
 </html>
