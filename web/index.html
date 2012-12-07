@@ -28,12 +28,11 @@ and OpenSSH, which were confirmed and fixed by the developers.
 Xi Wang, Haogang Chen, Zhihao Jia, Nickolai Zeldovich, M. Frans Kaashoek.<br>
 Proceedings of the 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI '12),
 Hollywood, CA, October 2012.
+</li>
 
 </ul>
 
-<h3>Examples of vulnerabilities</h3>
-
-<p>Here are some vulnerabilities found by KINT.</p>
+<h3>Examples of vulnerabilities found using KINT</h3>
 
 <ul>
 
@@ -66,10 +65,31 @@ libssh
 
 <h3>Software</h3>
 
-<p>Coming soon.</p>
-
 <ul>
-<li><a href="https://github.com/jiazhihao/clang">Compiler support for NaN integers</a>.
+
+<li><p>Static analyzer.
+<br />
+Obtain the latest code using:
+<br />
+<code>
+git clone git://g.csail.mit.edu/kint
+</code>
+<br />
+See README and INSTALL for more information.
+</p></li>
+
+<li><p>NaN integers.
+<br />
+Follow the instructions of <a href="http://clang.llvm.org/get_started.html">building Clang</a>.
+Replace the original Clang with our modified version:
+<br />
+<code>
+git clone -b nan https://github.com/jiazhihao/clang.git
+</code>
+<br />
+You can find examples in <a href="https://github.com/jiazhihao/clang#readme">README</a>.
+</p></li>
+
 </ul>
 
 <h3>People</h3>
