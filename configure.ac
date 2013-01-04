@@ -36,5 +36,6 @@ AC_CONFIG_LINKS([
 	bin/intck:src/intck
 	bin/cmpck:src/cmpck
 	bin/pintck:src/pintck
+	bin/pcmpck:src/pcmpck
 ])
 AC_OUTPUT
